@@ -1,10 +1,10 @@
 {
-	"id": "obsidian-notion-paste-links",
+	"id": "notion-paste-links",
 	"name": "Notion Paste Links",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "Notion-style link pills with favicons. Paste URLs and convert to styled mentions with @[Title|URL] syntax.",
-	"author": "Obsidian",
+	"author": "zincplusplus",
 	"authorUrl": "https://obsidian.md",
 	"fundingUrl": "https://obsidian.md/pricing",
 	"isDesktopOnly": false

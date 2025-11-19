@@ -49,7 +49,7 @@ This renders as a styled pill with:
 
 ### Manual Installation
 1. Download `main.js`, `manifest.json`, and `styles.css`
-2. Create folder `VaultFolder/.obsidian/plugins/obsidian-notion-paste-links/`
+2. Create folder `VaultFolder/.obsidian/plugins/notion-paste-links/`
 3. Copy files to the folder
 4. Reload Obsidian
 5. Enable the plugin in Settings → Community Plugins

@@ -1,5 +1,5 @@
 {
-	"name": "obsidian-notion-paste-links",
+	"name": "notion-paste-links",
 	"version": "1.0.0",
 	"description": "Notion-style link pills with favicons. Paste URLs and convert to styled mentions with @[Title|URL] syntax.",
 	"main": "main.js",
