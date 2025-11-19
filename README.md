@@ -6,10 +6,9 @@ This plugin brings Notion-style link pasting to Obsidian.
 
 - **Paste Interception**: When you paste a URL, it is inserted immediately, and a menu appears allowing you to transform it.
 - **Transformation Options**:
-    - **Mention**: Converts the URL to `[Page Title](URL)`.
-    - **Preview Card**: Converts the URL to a rich Callout block with Open Graph metadata (Title, Description, Image).
+    - **Mention**: Converts the URL to `@[URL]` which renders as a styled pill with favicon and page title.
     - **Keep as URL**: Leaves the raw URL as is.
-- **Context Menu**: Right-click on any existing URL to convert it to a Mention or Preview Card.
+- **Context Menu**: Right-click on any existing URL or mention to convert between formats.
 
 ## Installation
 

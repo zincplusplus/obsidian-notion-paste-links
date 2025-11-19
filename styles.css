@@ -6,3 +6,44 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+/* Notion-style Inline Link Pill */
+.notion-link-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--text-normal) !important;
+    text-decoration: none !important;
+    line-height: 1.4;
+    transition: background-color 0.1s ease;
+    white-space: nowrap;
+    transform: translateY(2px);
+}
+
+.notion-link-pill:hover {
+    background-color: var(--background-modifier-hover); /* Adaptive gray */
+    text-decoration: none !important;
+    cursor: pointer;
+    user-select: none;
+}
+
+.notion-link-pill img {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    margin: 0;
+    vertical-align: middle;
+}
+
+.notion-link-pill span {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Ensure container anchor doesn't have default styles if we use it */
+a.notion-link-pill-container {
+    text-decoration: none !important;
+    border-bottom: none !important;
+}
