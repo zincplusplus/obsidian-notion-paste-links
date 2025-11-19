@@ -7,36 +7,13 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { RangeSetBuilder, EditorState } from "@codemirror/state";
-import { editorLivePreviewField, requestUrl } from "obsidian";
+import { editorLivePreviewField } from "obsidian";
 
-// Regex to match @[URL]
-const MENTION_REGEX = /\@\[([^\]]+)\]/g;
-
-// Cache for fetched titles
-const titleCache = new Map<string, string>();
-
-// Function to fetch title for a URL
-async function fetchTitle(url: string): Promise<string> {
-  if (titleCache.has(url)) {
-    return titleCache.get(url)!;
-  }
-
-  try {
-    const html = await requestUrl({ url }).text;
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const title = doc.querySelector('meta[property="og:title"]')?.getAttribute('content') || doc.title || url;
-    titleCache.set(url, title);
-    return title;
-  } catch (error) {
-    console.error('Failed to fetch title:', error);
-    const fallbackTitle = url;
-    titleCache.set(url, fallbackTitle);
-    return fallbackTitle;
-  }
-}
+// Regex to match @[Title|URL]
+const MENTION_REGEX = /\@\[([^\|]+)\|([^\]]+)\]/g;
 
 class MentionWidget extends WidgetType {
-  constructor(readonly url: string) {
+  constructor(readonly url: string, readonly title: string) {
     super();
   }
 
@@ -55,13 +32,8 @@ class MentionWidget extends WidgetType {
       // Invalid URL, no icon
     }
 
-    // Title placeholder
-    const titleSpan = span.createSpan({ text: " Loading..." });
-
-    // Fetch title asynchronously
-    fetchTitle(this.url).then(title => {
-      titleSpan.textContent = " " + title;
-    });
+    // Display title from syntax
+    span.createSpan({ text: " " + this.title });
 
     // Handle click to open link
     span.onclick = (e) => {
@@ -168,10 +140,11 @@ export const mentionPlugin = ViewPlugin.fromClass(
         while ((match = MENTION_REGEX.exec(text))) {
           const start = from + match.index;
           const end = start + match[0].length;
-          const url = match[1];
+          const title = match[1];
+          const url = match[2];
 
           // Skip decoration if cursor is inside this mention
-          // This allows the user to edit the raw @[URL] text
+          // This allows the user to edit the raw @[Title|URL] text
           if (cursorPos >= start && cursorPos <= end) {
             continue;
           }
@@ -180,7 +153,7 @@ export const mentionPlugin = ViewPlugin.fromClass(
             from: start,
             to: end,
             decoration: Decoration.replace({
-              widget: new MentionWidget(url),
+              widget: new MentionWidget(url, title),
               block: false,
               inclusive: false,
               side: 1,

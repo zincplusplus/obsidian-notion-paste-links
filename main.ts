@@ -7,14 +7,14 @@ export default class PasteLinksPlugin extends Plugin {
 		this.registerEditorExtension(mentionPlugin);
 
 		// Register Markdown Post Processor for Reading Mode
-		// Note: @[URL] won't be rendered as a link by Obsidian, so we need to detect it in text
+		// Note: @[URL|Title] won't be rendered as a link by Obsidian, so we need to detect it in text
 		this.registerMarkdownPostProcessor((element, context) => {
 			const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
 			const nodesToReplace: { node: Text, match: RegExpMatchArray }[] = [];
 
 			let node;
 			while (node = walker.nextNode() as Text) {
-				const mentionRegex = /\@\[([^\]]+)\]/g;
+				const mentionRegex = /\@\[([^\|]+)\|([^\]]+)\]/g;
 				let match;
 				while ((match = mentionRegex.exec(node.textContent || ''))) {
 					nodesToReplace.push({ node, match });
@@ -22,7 +22,8 @@ export default class PasteLinksPlugin extends Plugin {
 			}
 
 			for (const { node, match } of nodesToReplace) {
-				const url = match[1];
+				const title = match[1];
+				const url = match[2];
 				const span = createEl("span", { cls: "notion-link-pill" });
 
 				try {
@@ -35,12 +36,8 @@ export default class PasteLinksPlugin extends Plugin {
 					// Invalid URL
 				}
 
-				const titleSpan = span.createSpan({ text: " Loading..." });
-
-				// Fetch title
-				this.fetchMetadata(url).then(metadata => {
-					titleSpan.textContent = " " + metadata.title;
-				});
+				// Display title from syntax
+				span.createSpan({ text: " " + title });
 
 				span.onclick = () => window.open(url, "_blank");
 
@@ -117,8 +114,8 @@ export default class PasteLinksPlugin extends Plugin {
 		const cursor = editor.getCursor();
 		const line = editor.getLine(cursor.line);
 
-		// 1. Check for @[URL] mentions
-		const mentionRegex = /\@\[([^\]]+)\]/g;
+		// 1. Check for @[Title|URL] mentions
+		const mentionRegex = /\@\[([^\|]+)\|([^\]]+)\]/g;
 		let match;
 		while ((match = mentionRegex.exec(line))) {
 			const start = match.index;
@@ -127,8 +124,8 @@ export default class PasteLinksPlugin extends Plugin {
 			if (cursor.ch >= start && cursor.ch <= end) {
 				return {
 					type: 'mention',
-					url: match[1],
-					title: '@mention',
+					url: match[2],
+					title: match[1],
 					range: {
 						from: { line: cursor.line, ch: start },
 						to: { line: cursor.line, ch: end }
@@ -228,8 +225,12 @@ export default class PasteLinksPlugin extends Plugin {
 				.setTitle('Mention')
 				.setIcon('link')
 				.onClick(async () => {
-					// Use @[URL] format
-					const replacement = `@[${url}]`;
+					// Fetch title for the URL
+					new Notice('Fetching metadata...');
+					const metadata = await this.fetchMetadata(url);
+
+					// Use @[Title|URL] format
+					const replacement = `@[${metadata.title}|${url}]`;
 
 					if (range) {
 						editor.replaceRange(replacement, range.from, range.to);
