@@ -196,6 +196,22 @@ export default class PasteLinksPlugin extends Plugin {
 		if (!clipboardText) return;
 
 		if (this.isValidUrl(clipboardText)) {
+			// Check if cursor is inside an existing mention
+			const cursor = editor.getCursor();
+			const line = editor.getLine(cursor.line);
+			const mentionRegex = /\@\[([^\|]+)\|([^\]]+)\]/g;
+			let match;
+
+			while ((match = mentionRegex.exec(line))) {
+				const start = match.index;
+				const end = start + match[0].length;
+
+				// If cursor is inside a mention, don't show the menu
+				if (cursor.ch >= start && cursor.ch <= end) {
+					return; // Let default paste behavior happen
+				}
+			}
+
 			evt.preventDefault();
 
 			// Insert the URL immediately
