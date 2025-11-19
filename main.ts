@@ -304,47 +304,11 @@ export default class PasteLinksPlugin extends Plugin {
 
 			menu.showAtPosition({ x, y });
 		} else {
-			console.warn('Could not get cursor coordinates');
 			new Notice('Could not determine menu position');
 		}
 	}
 
-	showMenuFallback(menu: Menu, editor: Editor, range?: { from: any, to: any }) {
-		let coords;
 
-		// Try to get coordinates from CodeMirror instance (works for CM6)
-		const cm = (editor as any).cm;
-		if (cm && cm.coordsAtPos && range) {
-			// Use the END of the range (where the URL ends) for positioning
-			const pos = editor.posToOffset(range.to);
-			coords = cm.coordsAtPos(pos);
-		} else if (cm && cm.coordsAtPos) {
-			// Fallback to current cursor
-			const cursor = editor.getCursor();
-			const pos = editor.posToOffset(cursor);
-			coords = cm.coordsAtPos(pos);
-		}
-
-		// Fallback to window selection if CM method fails
-		if (!coords) {
-			const selection = window.getSelection();
-			if (selection && selection.rangeCount > 0) {
-				const range = selection.getRangeAt(0);
-				const rect = range.getBoundingClientRect();
-				// Check if rect is valid (not 0,0)
-				if (rect.width > 0 || rect.height > 0 || rect.left > 0 || rect.top > 0) {
-					coords = { left: rect.left, bottom: rect.bottom };
-				}
-			}
-		}
-
-		if (coords) {
-			menu.showAtPosition({ x: coords.left, y: coords.bottom });
-		} else {
-			console.warn('Could not get cursor coordinates');
-			new Notice('Could not determine menu position');
-		}
-	}
 
 	async fetchMetadata(url: string): Promise<{ title: string, description: string, image: string, icon: string }> {
 		try {
@@ -363,14 +327,12 @@ export default class PasteLinksPlugin extends Plugin {
 				try {
 					icon = new URL(icon, url).href;
 				} catch (e) {
-					console.warn('Failed to resolve icon URL:', icon);
 					icon = '';
 				}
 			}
 
 			return { title, description, image, icon };
 		} catch (error) {
-			console.error('Failed to fetch metadata:', error);
 			return { title: url, description: '', image: '', icon: '' };
 		}
 	}
