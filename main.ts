@@ -60,17 +60,12 @@ export default class PasteLinksPlugin extends Plugin {
 		this.registerEvent(
 			this.app.workspace.on('editor-menu', (menu, editor, view) => {
 				const selection = editor.getSelection();
-				let linkData = null;
-
-				console.log('PasteLinks: Right-click detected');
-				console.log('PasteLinks: Selection:', selection);
-				console.log('PasteLinks: Cursor:', editor.getCursor());
+				let linkData: { type: string, url: string, title: string | null, range: any } | null = null;
 
 				if (selection && this.isValidUrl(selection)) {
 					linkData = { type: 'raw', url: selection, title: null, range: null };
 				} else if (!selection) {
 					linkData = this.getLinkAtCursor(editor);
-					console.log('PasteLinks: getLinkAtCursor result:', linkData);
 				}
 
 				if (linkData) {
@@ -81,24 +76,27 @@ export default class PasteLinksPlugin extends Plugin {
 					const menuTitle = isMention ? 'Convert to Regular Link' : 'Convert to Mention';
 					const menuIcon = isMention ? 'link' : 'link';
 
+					// Capture linkData for the callback
+					const capturedLinkData = linkData;
+
 					menu.addItem((item) =>
 						item
 							.setTitle(menuTitle)
 							.setIcon(menuIcon)
 							.onClick(async () => {
-								let title = linkData.title;
+								let title = capturedLinkData.title;
 								let replacement;
 
 								if (isMention) {
 									// Convert to Regular Link: Remove @[]
-									replacement = linkData.url;
+									replacement = capturedLinkData.url;
 								} else {
 									// Convert to Mention: Use @[URL]
-									replacement = `@[${linkData.url}]`;
+									replacement = `@[${capturedLinkData.url}]`;
 								}
 
-								if (linkData.range) {
-									editor.replaceRange(replacement, linkData.range.from, linkData.range.to);
+								if (capturedLinkData.range) {
+									editor.replaceRange(replacement, capturedLinkData.range.from, capturedLinkData.range.to);
 								} else {
 									editor.replaceSelection(replacement);
 								}
