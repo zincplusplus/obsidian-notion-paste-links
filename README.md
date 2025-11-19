@@ -13,9 +13,7 @@ This plugin brings Notion-style link pasting to Obsidian.
 
 ## Installation
 
-1.  Clone this repository into your vault's `.obsidian/plugins` directory.
-2.  Run `npm install` and `npm run build`.
-3.  Enable the plugin in Obsidian settings.
+TODO: Add installation instructions
 
 ## License
 
