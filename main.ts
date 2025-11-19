@@ -1,134 +1,168 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { Editor, MarkdownView, Menu, Plugin, requestUrl, Notice } from 'obsidian';
 
-// Remember to rename these classes and interfaces!
-
-interface MyPluginSettings {
-	mySetting: string;
-}
-
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
-}
-
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
-
+export default class PasteLinksPlugin extends Plugin {
 	async onload() {
-		await this.loadSettings();
+		this.registerEvent(
+			this.app.workspace.on('editor-paste', this.handlePaste.bind(this))
+		);
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (_evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
+		this.registerEvent(
+			this.app.workspace.on('editor-menu', (menu, editor, view) => {
+				const selection = editor.getSelection();
+				if (this.isValidUrl(selection)) {
+					menu.addSeparator();
+					menu.addItem((item) =>
+						item
+							.setTitle('Convert to Mention')
+							.setIcon('link')
+							.onClick(async () => {
+								new Notice('Fetching title...');
+								const title = await this.fetchPageTitle(selection);
+								editor.replaceSelection(`[${title}](${selection})`);
+							})
+					);
+					menu.addItem((item) =>
+						item
+							.setTitle('Convert to Preview Card')
+							.setIcon('image-file')
+							.onClick(async () => {
+								new Notice('Fetching metadata...');
+								const metadata = await this.fetchMetadata(selection);
+								const callout = `> [!example] [${metadata.title}](${selection})\n> ${metadata.description || 'No description'}\n> ![](${metadata.image || ''})`;
+								editor.replaceSelection(callout);
+							})
+					);
+				}
+			})
+		);
+	}
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
+	async handlePaste(evt: ClipboardEvent, editor: Editor, view: MarkdownView) {
+		const clipboardText = evt.clipboardData?.getData('text/plain');
+		if (!clipboardText) return;
 
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, _view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
+		if (this.isValidUrl(clipboardText)) {
+			evt.preventDefault();
+
+			// Insert the URL immediately
+			const from = editor.getCursor();
+			editor.replaceSelection(clipboardText);
+			const to = editor.getCursor();
+
+			// Show menu to transform the inserted URL
+			this.showLinkMenu(clipboardText, editor, { from, to });
+		}
+	}
+
+	isValidUrl(text: string): boolean {
+		try {
+			const url = new URL(text);
+			return ['http:', 'https:'].includes(url.protocol);
+		} catch (_) {
+			return false;
+		}
+	}
+
+	showLinkMenu(url: string, editor: Editor, range?: { from: any, to: any }) {
+		const menu = new Menu();
+
+		menu.addItem((item) =>
+			item
+				.setTitle('Mention')
+				.setIcon('link')
+				.onClick(async () => {
+					new Notice('Fetching title...');
+					const title = await this.fetchPageTitle(url);
+					const replacement = `[${title}](${url})`;
+					if (range) {
+						editor.replaceRange(replacement, range.from, range.to);
+					} else {
+						editor.replaceSelection(replacement);
 					}
+				})
+		);
 
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
+		menu.addItem((item) =>
+			item
+				.setTitle('Keep as URL')
+				.setIcon('globe')
+				.onClick(() => {
+					// Do nothing, URL is already there
+				})
+		);
+
+		menu.addItem((item) =>
+			item
+				.setTitle('Preview Card')
+				.setIcon('image-file')
+				.onClick(async () => {
+					new Notice('Fetching metadata...');
+					const metadata = await this.fetchMetadata(url);
+					const callout = `> [!example] [${metadata.title}](${url})\n> ${metadata.description || 'No description'}\n> ![](${metadata.image || ''})`;
+					if (range) {
+						editor.replaceRange(callout, range.from, range.to);
+					} else {
+						editor.replaceSelection(callout);
+					}
+				})
+		);
+
+		let coords;
+
+		// Try to get coordinates from CodeMirror instance (works for CM6)
+		const cm = (editor as any).cm;
+		if (cm && cm.coordsAtPos) {
+			// We want the menu at the end of the inserted URL (current cursor)
+			const cursor = editor.getCursor();
+			const pos = editor.posToOffset(cursor);
+			coords = cm.coordsAtPos(pos);
+		}
+
+		// Fallback to window selection if CM method fails
+		if (!coords) {
+			const selection = window.getSelection();
+			if (selection && selection.rangeCount > 0) {
+				const range = selection.getRangeAt(0);
+				const rect = range.getBoundingClientRect();
+				// Check if rect is valid (not 0,0)
+				if (rect.width > 0 || rect.height > 0 || rect.left > 0 || rect.top > 0) {
+					coords = { left: rect.left, bottom: rect.bottom };
 				}
 			}
-		});
+		}
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		if (coords) {
+			menu.showAtPosition({ x: coords.left, y: coords.bottom });
+		} else {
+			console.warn('Could not get cursor coordinates');
+			new Notice('Could not determine menu position');
+		}
 	}
 
-	onunload() {
-
+	async fetchPageTitle(url: string): Promise<string> {
+		try {
+			const html = await requestUrl({ url }).text;
+			const doc = new DOMParser().parseFromString(html, 'text/html');
+			return doc.title || url;
+		} catch (error) {
+			console.error('Failed to fetch title:', error);
+			return url;
+		}
 	}
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
+	async fetchMetadata(url: string): Promise<{ title: string, description: string, image: string }> {
+		try {
+			const html = await requestUrl({ url }).text;
+			const doc = new DOMParser().parseFromString(html, 'text/html');
 
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
+			const title = doc.querySelector('meta[property="og:title"]')?.getAttribute('content') || doc.title || url;
+			const description = doc.querySelector('meta[property="og:description"]')?.getAttribute('content') || '';
+			const image = doc.querySelector('meta[property="og:image"]')?.getAttribute('content') || '';
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
-}
-
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		const {containerEl} = this;
-
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
+			return { title, description, image };
+		} catch (error) {
+			console.error('Failed to fetch metadata:', error);
+			return { title: url, description: '', image: '' };
+		}
 	}
 }
